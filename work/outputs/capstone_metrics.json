@@ -1,0 +1,22 @@
+{
+  "warehouse_release": "v20260703",
+  "warehouse_march_rows": 9841378,
+  "starter_rows": 30000,
+  "complete_case_rows": 19897,
+  "train_rows": 14114,
+  "test_rows": 5783,
+  "train_clients": 20,
+  "test_clients": 9,
+  "client_overlap": 0,
+  "test_base_rate": 0.6228601072107902,
+  "baseline_precision_at_50": 0.52,
+  "logreg_precision_at_50": 0.72,
+  "logreg_roc_auc": 0.5860659712967042,
+  "rf_precision_at_50": 0.72,
+  "rf_roc_auc": 0.6124710124616183,
+  "random_rf_precision_at_50": 0.94,
+  "random_rf_roc_auc": 0.7516437230026225,
+  "deliberate_leak_rf_roc_auc": 1.0,
+  "review_capacity": 50,
+  "claim_scope": "Decision-support ranking for an observed decline proxy; not prospective forecasting or causal intervention evidence."
+}

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>
+Prioritising Content Review with Machine Learning
+</title>
+
+<style>
+:root {
+  --text: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --soft: #f7f8fa;
+  --accent: #1d4ed8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--text);
+  line-height: 1.65;
+  background: white;
+}
+
+main {
+  width: min(860px, 92vw);
+  margin: 0 auto;
+  padding: 64px 0 100px;
+}
+
+h1 {
+  font-size: clamp(2.1rem, 6vw, 3.8rem);
+  line-height: 1.08;
+  margin-bottom: 16px;
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  margin-top: 64px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+h3 {
+  margin-top: 32px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 1.15rem;
+  max-width: 720px;
+}
+
+.author {
+  margin-top: 22px;
+  font-weight: 600;
+}
+
+.abstract {
+  margin-top: 36px;
+  padding: 24px;
+  background: var(--soft);
+  border-left: 4px solid var(--accent);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 32px 0;
+}
+
+.metric {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.metric strong {
+  display: block;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+img {
+  width: 100%;
+  height: auto;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.caption {
+  color: var(--muted);
+  font-size: .92rem;
+  margin-top: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  font-weight: 600;
+}
+
+.callout {
+  padding: 22px;
+  background: var(--soft);
+  border-radius: 10px;
+  margin: 28px 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+footer {
+  margin-top: 72px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  main {
+    padding-top: 36px;
+  }
+
+  h2 {
+    margin-top: 48px;
+  }
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<header>
+<h1>Prioritising Content Review with Machine Learning</h1>
+
+<p class="subtitle">
+A leakage-aware, client-grouped ranking study on
+anonymised search data.
+</p>
+
+<p class="author">Surya Kalimuthu</p>
+</header>
+
+
+<section>
+<h2>Abstract</h2>
+
+<div class="abstract">
+<p>
+Content teams with limited review capacity need a
+defensible way to decide which pages to investigate
+first. I framed this as a ranking problem and used
+anonymised FlyRank search, content and engagement
+signals with a rule-derived recent-decline proxy as
+the evaluation target. Logistic Regression and Random
+Forest models were compared with an impressions-only
+baseline using a client-grouped holdout that kept all
+pages from each client entirely in training or test
+data. On nine unseen test clients, the Random Forest
+measured Precision@50 of <strong>0.720</strong>,
+compared with <strong>0.520</strong> for
+the impressions-only baseline, with ROC-AUC of
+<strong>0.612</strong>. These results provide
+directional evidence for a human-reviewed content
+prioritisation queue, not evidence of prospective
+decline prediction or causal benefit from refreshing
+content.
+</p>
+</div>
+</section>
+
+
+<section>
+<h2>1. Introduction / Problem</h2>
+
+<p>
+A content reviewer cannot inspect every page every
+week. The practical decision is therefore not simply
+whether a page is declining, but which pages should
+be investigated first when review capacity is limited.
+</p>
+
+<p>
+A false positive consumes scarce reviewer time.
+A false negative can leave a page showing the decline
+proxy outside the current queue. This makes the
+problem naturally suited to ranking and motivates
+Precision@50 as the primary operational metric.
+</p>
+
+<div class="callout">
+<strong>Research question:</strong>
+Can a learned combination of page-level search,
+content and engagement signals rank content-review
+opportunities more effectively than a simple
+demand-based baseline while generalising across
+unseen clients?
+</div>
+</section>
+
+
+<section>
+<h2>2. Data</h2>
+
+<p>
+The project used two related FlyRank data layers.
+The production-scale FlyRank internship warehouse,
+release v20260703, contains approximately 78.8 million
+daily content-performance rows. I queried its
+month-partitioned Parquet files directly with DuckDB.
+The verified March 2026 partition contained
+<strong>9,841,378</strong>
+rows spanning
+<strong>2026-03-01 00:00:00</strong>
+to
+<strong>2026-03-31 00:00:00</strong>.
+</p>
+
+<p>
+The final ranking models were trained on the smaller
+anonymised starter snapshot containing
+<strong>30,000</strong> rows and
+<strong>44</strong> columns. Requiring all
+final model fields to be present left
+<strong>19,897</strong> complete-case rows.
+The warehouse scale therefore describes the broader
+data environment and schema work; the final model was
+not trained on 78.8 million rows.
+</p>
+
+<p>
+No client names, URLs or raw search queries appear in
+the public analysis.
+</p>
+</section>
+
+
+<section>
+<h2>3. Methodology</h2>
+
+<p>
+The task is ranking/scoring. The target is the
+rule-derived proxy
+<code>trend_direction == "down"</code>.
+The target and its source field are excluded from
+model inputs.
+</p>
+
+<p>
+Fourteen page-level search, content and engagement
+features were used. The baseline ranks pages only by
+90-day impressions. Logistic Regression and Random
+Forest were then evaluated against the same held-out
+population.
+</p>
+
+<p>
+Validation uses a 70/30 client-grouped split:
+20 clients for training
+and 9 previously unseen
+clients for testing, with zero client overlap.
+</p>
+
+<p>
+A deliberate leakage test added the target-source
+signal back into the model. ROC-AUC rose to
+<strong>1.000</strong>, confirming why
+near-perfect metrics require leakage investigation
+before being treated as model quality.
+</p>
+</section>
+
+
+<section>
+<h2>4. Results</h2>
+
+<div class="metrics">
+<div class="metric">
+<strong>0.720</strong>
+<span>Random Forest Precision@50</span>
+</div>
+
+<div class="metric">
+<strong>0.520</strong>
+<span>Impressions baseline P@50</span>
+</div>
+
+<div class="metric">
+<strong>0.612</strong>
+<span>Grouped RF ROC-AUC</span>
+</div>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Precision@50</th>
+<th>ROC-AUC</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>Impressions-only baseline</td>
+<td>0.520</td>
+<td>—</td>
+</tr>
+
+<tr>
+<td>Logistic Regression</td>
+<td>0.720</td>
+<td>0.586</td>
+</tr>
+
+<tr>
+<td>Random Forest</td>
+<td>0.720</td>
+<td>0.612</td>
+</tr>
+
+<tr>
+<td>Test-set decline prevalence</td>
+<td>0.623</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+
+<img
+src="img/capstone_precision_at_50.png"
+alt="Precision at 50 comparison">
+
+<p class="caption">
+The learned ranking placed more decline-proxy pages
+inside the limited review queue than the
+impressions-only ranking.
+</p>
+
+<img
+src="img/capstone_validation_sensitivity.png"
+alt="Random versus grouped validation comparison">
+
+<p class="caption">
+Random-row validation was substantially more
+optimistic; the paper therefore reports the
+client-grouped estimate for unseen-client
+generalisation.
+</p>
+</section>
+
+
+<section>
+<h2>5. Limitations & Honest Framing</h2>
+
+<p>
+The target is a contemporaneous rule-derived proxy,
+not a strictly future outcome. Several trailing-90-day
+features overlap the period used to construct that
+proxy, so this experiment should not be described as
+a prospective forecast of future decline.
+</p>
+
+<p>
+Complete-case filtering removed
+<strong>10,103</strong> rows, and
+the model was evaluated on only
+<strong>9</strong>
+held-out clients. Results therefore apply to the
+evaluated population and should not be assumed to
+generalise universally.
+</p>
+
+<p>
+The analysis is observational. It does not establish
+that refreshing, rewriting or otherwise editing a
+recommended page will cause traffic or ranking to
+improve.
+</p>
+
+<div class="callout">
+A stronger future design would measure all features
+before the outcome window begins—for example,
+features from days 1–90 followed by decline measured
+during days 91–120.
+</div>
+</section>
+
+
+<section>
+<h2>6. Ranked Recommendations</h2>
+
+<p>
+The model score determines which pages should be
+reviewed first; it does not determine the final
+editorial action. Reason codes provide context for a
+human reviewer.
+</p>
+
+<table>
+<thead>
+<tr>
+<th>Archetype</th>
+<th>Suggested human review</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>Visible, low CTR</td>
+<td>Review title, snippet and search-intent fit</td>
+</tr>
+
+<tr>
+<td>Low engagement, visible</td>
+<td>Review alignment, usefulness and content depth</td>
+</tr>
+
+<tr>
+<td>Thin, visible</td>
+<td>Review whether important topic coverage is missing</td>
+</tr>
+
+<tr>
+<td>Stale, visible context</td>
+<td>Check changed facts, SERP conditions and competitors</td>
+</tr>
+
+<tr>
+<td>Model priority only</td>
+<td>Diagnose manually before deciding whether to edit</td>
+</tr>
+</tbody>
+</table>
+
+<img
+src="img/capstone_action_mix.png"
+alt="Top 50 human review archetype mix">
+
+<p class="caption">
+Reason codes explain what a reviewer should inspect;
+they are not automatic edit instructions.
+</p>
+
+<div class="callout">
+<strong>Do not automate:</strong>
+publishing, rewriting, deleting, redirecting,
+consolidating or refreshing a page solely because
+the model ranked it highly.
+</div>
+</section>
+
+
+<section>
+<h2>7. Reproducibility</h2>
+
+<p>
+The analysis is versioned in the public repository.
+The capstone recreates the client-grouped split,
+models, metrics, figures and ranked demonstration
+queue using fixed random seeds.
+</p>
+
+<p>
+<a href="https://github.com/SuryaK5125/flyrank-ml">
+View the complete repository
+</a>
+</p>
+
+<p>
+Key notebooks:
+</p>
+
+<ul>
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w01_research_question.ipynb">
+Week 1 — Research question
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w02_ml_task_framing.ipynb">
+Week 2 — ML task framing
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w03_data_contract.ipynb">
+Week 3 — Data contract
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w04_baseline_score.ipynb">
+Week 4 — Baseline
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w05_model.ipynb">
+Week 5 — Modelling
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w06_validation_audit.ipynb">
+Week 6 — Validation audit
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/w07_action_playbook.ipynb">
+Week 7 — Action playbook
+</a>
+</li>
+
+<li>
+<a href="https://github.com/SuryaK5125/flyrank-ml/blob/main/work/notebooks/capstone.ipynb">
+Capstone notebook
+</a>
+</li>
+</ul>
+</section>
+
+
+<section>
+<h2>8. Acknowledgments & Data Credit</h2>
+
+<p>
+Built on the
+<a href="https://flyrank.ai">
+FlyRank ML Internship dataset
+</a>.
+Data and programme context provided by FlyRank.
+</p>
+</section>
+
+
+<footer>
+<p>
+Research artifact by Surya Kalimuthu. Results are presented
+as measured decision-support evidence with the
+limitations described above.
+</p>
+</footer>
+
+</main>
+</body>
+</html>
